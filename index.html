@@ -204,17 +204,32 @@ function bvSubmit(){if(BVK.busy)return;const inp=document.getElementById('bvk'),
  const a=bvAcc();if(a&&!a.o&&a.t)bvPost({a:'check',t:a.t,d:bvDev()}).then(r=>{if(r&&r.ok&&r.v===0){bvLS('bvAcc',null);bvLock(r.e=='limit'?'Цей доступ уже прив’язано до іншого пристрою. Уведіть свій ключ.':'Доступ на цьому пристрої скасовано. Уведіть новий ключ.')}}).catch(()=>{});
 }catch(e){}})();
 // ---- адмін панель власника
-const ADM={open:0,keys:null,used:null,msg:'',last:null,del:null,busy:0,ed:0};
+const bvUrlOk=v=>/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/[^\s"'<>]*)?$/i.test(v||'');
+function bvUrlFix(v){v=String(v||'').trim().replace(/\s+/g,'').replace(/\/+$/,'');if(v&&!/^https?:\/\//i.test(v))v='https://'+v;return v.replace(/^http:\/\//i,'https://')}
+const ADM={open:0,chk:'',keys:null,used:null,msg:'',last:null,del:null,busy:0,ed:0};
 const admEsc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function admOpen(){if(!bvIsOwn())return;PFUI.open=0;ADM.open=1;ADM.msg='';ADM.del=null;ADM.ed=0;try{ADM.keys=JSON.parse(bvLS('bvAdmK')||'null')}catch(e){ADM.keys=null}$('lobbyin').onclick=admClick;admRender();admSync()}
 function admLive(){return ADM.open&&$('lobbyin').onclick===admClick&&$('lobby').style.display!='none'}
 function admSync(){ADM.busy=1;bvPost({a:'list',m:bvLS('bvOwn')}).then(r=>{if(r&&r.ok){ADM.keys=r.keys||[];ADM.used=r.used|0;bvLS('bvAdmK',JSON.stringify(ADM.keys));ADM.msg=''}else ADM.msg='⚠ Сервер не прийняв ключ власника. Перевірте код сервера.'})
  .catch(e=>{ADM.msg=e&&e.e=='noapi'?'':'⚠ Немає зв’язку з сервером — показано збережений список.'}).finally(()=>{ADM.busy=0;if(admLive())admRender()})}
+function admCheck(){const api=bvApiNow();ADM.chk='🔍 Перевіряємо…';if(admLive())admRender();const fin=t=>{ADM.chk=t;if(admLive())admRender()};
+ if(!bvUrlOk(api)){fin('⚠ Адреса неповна або з помилкою. Має бути: https://bangvector-keys.ваш-нік.workers.dev');return}
+ const ac_=typeof AbortController!='undefined'?new AbortController():null,tm=setTimeout(()=>{try{ac_&&ac_.abort()}catch(e){}},12000);
+ fetch(api,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({a:'list',m:bvLS('bvOwn')}),signal:ac_?ac_.signal:undefined,cache:'no-store'})
+ .then(r=>r.text().then(t=>{let j=null;try{j=JSON.parse(t)}catch(e){}
+  if(!j)fin(/hello/i.test(t)?'⚠ Сервер працює, але там ще код «Hello World». Відкрийте Worker → Edit code, вставте код BangVector і натисніть Deploy.':'⚠ Сервер відповідає не тим кодом. Вставте код BangVector у Worker і натисніть Deploy.');
+  else if(j.e=='nodb')fin('⚠ Не прив’язана база. Worker → Bindings → Add binding → D1 database, Variable name: DB, база bangvector-keys → Add binding, потім Deploy.');
+  else if(j.e=='own')fin('⚠ Сервер не впізнав ключ власника — у Worker вставлено не той код. Вставте файл bangvector-keys-worker.js заново й натисніть Deploy.');
+  else if(j.ok)fin('✅ Сервер працює. Можна генерувати ключі.');
+  else fin('⚠ Сервер відповів помилкою: '+admEsc(j.e||r.status))}))
+ .catch(()=>fin(navigator.onLine===false?'⚠ Немає інтернету на телефоні.':'⚠ Сервер не знайдено за цією адресою. Перевірте, що адреса повна (закінчується на .workers.dev) і що у Worker натиснуто Deploy.'))
+ .finally(()=>clearTimeout(tm))}
 function admDt(t){const d=new Date(t||0),p=x=>('0'+x).slice(-2);return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())}
 function admRender(){if(!admLive())return;const api=bvApiNow(),loc=!BVK.api&&!BV_API_DEF&&!!api,ks=ADM.keys||[];
  let h='<h2>🛠 Адмін панель</h2>';
  if(!api||ADM.ed){h+='<div class="lroom" style="text-align:left"><div class="lrt">🔌 Сервер ключів</div><div class="lri">Уставте адресу свого Cloudflare Worker (див. інструкцію).</div><input id="admapi" placeholder="https://….workers.dev" value="'+admEsc(api)+'" style="font-size:13px;letter-spacing:0;margin:6px 0"><div class="lgrp"><button class="lch on" data-a="api">💾 Зберегти</button>'+(api?'<button class="lch" data-a="apix" style="flex:none">Скасувати</button>':'')+'</div></div>'}
- else h+='<div class="lri" style="text-align:left;word-break:break-all">🔌 Сервер: '+admEsc(api)+' <button class="pfe" data-a="aped">✏️</button></div>';
+ else{h+='<div class="lri" style="text-align:left;word-break:break-all">🔌 Сервер: '+admEsc(api)+' <button class="pfe" data-a="aped">✏️</button></div>';if(!bvUrlOk(api))h+='<div class="lm" style="color:#ffb3b3;text-align:left">⚠ Адреса неповна. Вона має виглядати так: https://bangvector-keys.ваш-нік.workers.dev — натисніть ✏️ і вставте повну адресу.</div>'}
+ if(api)h+='<button class="lch" data-a="chk" style="width:100%;margin:6px 0">🔍 Перевірити сервер</button>'+(ADM.chk?'<div class="lm" style="text-align:left;margin-bottom:6px;color:'+(ADM.chk[0]=='✅'?'#8dffa8':'#ffb3b3')+'">'+ADM.chk+'</div>':'');
  if(loc)h+='<div class="lroom" style="text-align:left;border-color:#c90"><div class="lri">⚠ Цей сервер поки знає лише ваш пристрій. Щоб ключі працювали в гравців, створіть у репозиторії гри файл <b>bv-config.json</b> з таким вмістом:</div><div class="lrt" style="font-size:12px;word-break:break-all;margin:6px 0">{"api":"'+admEsc(api)+'"}</div><button class="lch" data-a="cfg" style="width:100%">📋 Копіювати вміст файлу</button></div>';
  h+='<button class="sb sbG" data-a="gen"'+(api?'':' disabled')+'><b>🔑 Згенерувати ключ доступу</b><span>Одноразовий · 15 символів</span></button>';
  if(ADM.last)h+='<div class="lroom" style="border-color:#3fae5a"><div class="lri">Новий ключ:</div><div class="lrt admk" style="font-size:20px">'+ADM.last+'</div><button class="lch on" data-a="cl" style="width:100%">📋 Копіювати</button></div>';
@@ -229,7 +244,8 @@ function admClick(e){const t=e.target&&e.target.closest?e.target.closest('[data-
  if(a=='ref'){admSync()}
  else if(a=='aped'){ADM.ed=1}
  else if(a=='apix'){ADM.ed=0}
- else if(a=='api'){const v=String(($('admapi')||{}).value||'').trim().replace(/\/+$/,'');if(v&&!/^https:\/\/[^\s"'<>]+$/.test(v)){pfToast('Адреса має починатися з https://');return}bvLS('bvApi',v||null);ADM.ed=0;ADM.keys=null;ADM.used=null;admSync()}
+ else if(a=='api'){const v=bvUrlFix(($('admapi')||{}).value);if(v&&!bvUrlOk(v)){pfToast('Неповна адреса. Приклад: https://bangvector-keys.ваш-нік.workers.dev');return}bvLS('bvApi',v||null);ADM.ed=0;ADM.keys=null;ADM.used=null;ADM.chk='';admSync();admCheck();return}
+ else if(a=='chk'){admCheck();return}
  else if(a=='cfg'){admCopy('{"api":"'+bvApiNow()+'"}','📋 Вміст bv-config.json скопійовано');return}
  else if(a=='cl'){admCopy(ADM.last,'📋 Ключ скопійовано');return}
  else if(a=='gen'){if(ADM.busy)return;ADM.busy=1;ADM.msg='Генеруємо…';admRender();bvPost({a:'gen',m:bvLS('bvOwn')}).then(r=>{if(r&&r.ok&&r.k){ADM.last=r.k;ADM.keys=[[r.k,r.made]].concat((ADM.keys||[]).filter(x=>x[0]!==r.k));bvLS('bvAdmK',JSON.stringify(ADM.keys));ADM.msg=''}else ADM.msg='⚠ Не вдалося створити ключ ('+((r&&r.e)||'помилка')+')'})
