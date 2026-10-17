@@ -147,7 +147,7 @@ document.getElementById('nojs').style.display='none';
 
 // ================= КЛЮЧ ДОСТУПУ =================
 // Адреса сервера ключів (Cloudflare Worker). Можна також задати файлом bv-config.json поруч із грою: {"api":"https://..."}
-const BV_API_DEF='';
+const BV_API_DEF='https://bangvector-keys.khilchenko-kiril.workers.dev';
 const BVK={s:'bvown1:',h:'6c58aaf6a3491d0421513fcaf45fa494326f7dbc78c9655f9969a8f4fe34c33e',api:'',cfg:null,busy:0,own:null};
 function bvSha(s){s=unescape(encodeURIComponent(s));const K=[],H=[],fr=x=>(x-Math.floor(x))*4294967296|0;let n=2,c=0;
  while(c<64){let p=1;for(let d=2;d*d<=n;d++)if(n%d==0){p=0;break}if(p){if(c<8)H[c]=fr(Math.pow(n,1/2));K[c++]=fr(Math.pow(n,1/3))}n++}
